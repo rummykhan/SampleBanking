@@ -1,0 +1,955 @@
+type: edu
+custom_name: stage2
+files:
+- name: src/banking/Main.java
+  visible: true
+  text: |-
+    package banking;
+
+    import banking.auth.Authenticator;
+    import banking.auth.AuthenticatorImpl;
+    import banking.repository.AccountRepository;
+    import banking.repository.AccountRepositoryImpl;
+    import banking.ui.UserInterface;
+    import banking.ui.UserInterfaceImpl;
+
+    public class Main {
+        public static void main(String[] args) {
+
+            AccountRepository accountRepository = new AccountRepositoryImpl();
+            UserInterface userInterface = new UserInterfaceImpl();
+            Authenticator authenticator = new AuthenticatorImpl(accountRepository, userInterface);
+
+            BankingFacade bankingFacade = new BankingFacade(accountRepository, authenticator, userInterface);
+            bankingFacade.start();
+        }
+    }
+  learner_created: false
+- name: src/banking/BankingFacade.java
+  visible: true
+  text: |
+    package banking;
+
+    import banking.account.Account;
+    import banking.account.AccountManager;
+    import banking.auth.Authenticator;
+    import banking.helpers.Action;
+    import banking.helpers.Constants;
+    import banking.menu.AccountBalanceMenu;
+    import banking.menu.CreateAccountMenu;
+    import banking.menu.Menu;
+    import banking.repository.AccountRepository;
+    import banking.ui.UserInterface;
+
+    public class BankingFacade {
+        AccountRepository accountRepository = null;
+        Authenticator authenticator = null;
+        UserInterface userInterface = null;
+
+        Menu createAccountMenu;
+        Menu accountBalanceMenu;
+
+        private BankingFacade() {
+
+        }
+
+        public BankingFacade(AccountRepository accountRepository,
+                             Authenticator authenticator,
+                             UserInterface userInterface
+        ) {
+            this.accountRepository = accountRepository;
+            this.authenticator = authenticator;
+            this.userInterface = userInterface;
+
+            this.createAccountMenu = new CreateAccountMenu(this.userInterface);
+            this.accountBalanceMenu = new AccountBalanceMenu(this.userInterface);
+
+        }
+
+        public void start() {
+            this.showCreateAccountMenu();
+            Action action = this.createAccountMenu.getUserInput();
+
+            switch (action) {
+
+                case CREATE_ACCOUNT:
+                    this.createAccount();
+                    break;
+
+                case LOGIN_ACCOUNT:
+                    this.loginAccount();
+                    break;
+
+                case EXIT:
+                    this.exitApplication();
+                    break;
+
+            }
+        }
+
+        private void showCreateAccountMenu() {
+            this.createAccountMenu.show();
+        }
+
+        private void createAccount() {
+            Account account = AccountManager.newAccount();
+
+            this.accountRepository.createAccount(account);
+
+            this.showAccount(account);
+
+            this.start();
+        }
+
+        private void showAccount(Account account) {
+            this.prepareOutput();
+            this.userInterface.println(Constants.MESSAGE_CARD_CREATED);
+            this.userInterface.println(Constants.LABEL_YOUR_CARD);
+            this.userInterface.println(account.getCardNumber());
+            this.userInterface.println(Constants.LABEL_YOUR_PIN);
+            this.userInterface.println(account.getPinCode());
+        }
+
+        private void loginAccount() {
+            this.prepareOutput();
+
+            this.userInterface.println(Constants.QUESTION_YOUR_CARD);
+            String cardNumber = this.userInterface.readLine();
+
+            this.userInterface.println(Constants.QUESTION_YOUR_PIN);
+            String pinCode = this.userInterface.readLine();
+
+            if (this.authenticator.login(cardNumber, pinCode)) {
+                this.prepareOutput();
+                this.userInterface.println(Constants.MESSAGE_LOGGED_IN);
+                this.showAccountMenu();
+            } else {
+                this.prepareOutput();
+                this.userInterface.println(Constants.MESSAGE_WRONG_CARD);
+                this.start();
+            }
+        }
+
+        private void showAccountMenu() {
+            this.accountBalanceMenu.show();
+            Action action = this.accountBalanceMenu.getUserInput();
+
+            switch (action) {
+
+                case BALANCE:
+                    this.showBalance();
+                    this.showAccountMenu();
+                    break;
+
+                case LOGOUT_ACCOUNT:
+                    this.logoutAccount();
+                    this.start();
+                    break;
+
+                case EXIT:
+                    this.exitApplication();
+                    break;
+
+            }
+        }
+
+        private void showBalance() {
+            Account account = this.authenticator.account();
+            this.prepareOutput();
+            this.userInterface.println(Constants.LABEL_BALANCE + " " + account.getBalance());
+        }
+
+        private void logoutAccount() {
+            this.authenticator.logout();
+            this.prepareOutput();
+            this.userInterface.println(Constants.MESSAGE_LOGGED_OUT);
+        }
+
+        private void exitApplication() {
+            this.prepareOutput();
+            this.userInterface.println(Constants.MESSAGE_BYE);
+            System.exit(0);
+        }
+
+        private void prepareOutput(){
+            this.userInterface.println("");
+        }
+    }
+  learner_created: false
+- name: src/banking/menu/CreateAccountMenu.java
+  visible: true
+  text: |
+    package banking.menu;
+
+    import banking.helpers.Action;
+    import banking.helpers.Constants;
+    import banking.ui.UserInterface;
+
+    import java.util.ArrayList;
+    import java.util.List;
+
+    public class CreateAccountMenu extends BankMenu implements Menu {
+
+        public CreateAccountMenu(UserInterface userInterface) {
+            super(userInterface);
+        }
+
+        @Override
+        public List<Option> getOptionList() {
+
+            List<Option> optionList = new ArrayList<>();
+
+            optionList.add(new OptionImpl(Action.CREATE_ACCOUNT, Constants.MENU_CREATE_ACCOUNT));
+            optionList.add(new OptionImpl(Action.LOGIN_ACCOUNT, Constants.MENU_LOG_IN));
+            optionList.add(new OptionImpl(Action.EXIT, Constants.MENU_EXIT));
+
+            return optionList;
+        }
+
+
+    }
+  learner_created: false
+- name: src/banking/menu/AccountBalanceMenu.java
+  visible: true
+  text: |
+    package banking.menu;
+
+    import banking.helpers.Action;
+    import banking.helpers.Constants;
+    import banking.ui.UserInterface;
+
+    import java.util.ArrayList;
+    import java.util.List;
+
+    public class AccountBalanceMenu extends BankMenu implements Menu {
+
+        public AccountBalanceMenu(UserInterface userInterface) {
+            super(userInterface);
+        }
+
+        @Override
+        public List<Option> getOptionList() {
+
+            List<Option> optionList = new ArrayList<>();
+
+            optionList.add(new OptionImpl(Action.BALANCE, Constants.MENU_BALANCE));
+            optionList.add(new OptionImpl(Action.LOGOUT_ACCOUNT, Constants.MENU_LOGOUT));
+            optionList.add(new OptionImpl(Action.EXIT, Constants.MENU_EXIT));
+
+            return optionList;
+        }
+
+
+    }
+  learner_created: false
+- name: src/banking/menu/Menu.java
+  visible: true
+  text: |
+    package banking.menu;
+
+    import banking.helpers.Action;
+
+    import java.util.List;
+
+    public interface Menu {
+
+        public List<Option> getOptions();
+
+        public void show();
+
+        public Action getUserInput();
+    }
+  learner_created: false
+- name: src/banking/menu/Option.java
+  visible: true
+  text: |
+    package banking.menu;
+
+    import banking.helpers.Action;
+
+    public interface Option {
+
+        public Action getAction();
+        public String getOption();
+        public String toString();
+    }
+  learner_created: false
+- name: src/banking/menu/OptionImpl.java
+  visible: true
+  text: |
+    package banking.menu;
+
+    import banking.helpers.Action;
+
+    public class OptionImpl implements Option {
+        private final Action action;
+        private final String option;
+
+        public OptionImpl(Action action, String option) {
+            this.action = action;
+            this.option = option;
+        }
+
+        @Override
+        public Action getAction() {
+            return this.action;
+        }
+
+        @Override
+        public String getOption() {
+            return this.option;
+        }
+
+        @Override
+        public String toString() {
+            return this.getAction().getValue() + ". " + this.getOption();
+        }
+    }
+  learner_created: false
+- name: src/banking/menu/BankMenu.java
+  visible: true
+  text: |
+    package banking.menu;
+
+    import banking.helpers.Action;
+    import banking.helpers.Constants;
+    import banking.ui.UserInterface;
+
+    import java.util.List;
+    import java.util.Optional;
+
+    public abstract class BankMenu {
+
+        protected UserInterface userInterface;
+
+        public BankMenu(UserInterface userInterface) {
+            this.userInterface = userInterface;
+        }
+
+        public void show() {
+            this.userInterface.println("");
+            for (Option option : this.getOptions()) {
+                this.userInterface.println(String.valueOf(option));
+            }
+            this.userInterface.print(Constants.SYMBOL_INPUT);
+        }
+
+        public Action getUserInput() {
+            int userInput = this.userInterface.readInt();
+
+            Optional<Option> optionalOption = this.getOptionList().stream()
+                    .filter(option -> option.getAction().getValue() == userInput)
+                    .findFirst();
+
+            return optionalOption.orElse(null).getAction();
+        }
+
+        public abstract List<Option> getOptionList();
+
+        public List<Option> getOptions() {
+            return this.getOptionList();
+        }
+    }
+  learner_created: false
+- name: src/banking/ui/UserInterface.java
+  visible: true
+  text: |
+    package banking.ui;
+
+    import banking.helpers.Action;
+    import banking.menu.Menu;
+
+    public interface UserInterface {
+
+        public Action showMenu(Menu menu);
+
+        public void println(String log);
+
+        public void print(String log);
+
+        public int readInt();
+
+        public String readLine();
+    }
+  learner_created: false
+- name: src/banking/ui/UserInterfaceImpl.java
+  visible: true
+  text: |
+    package banking.ui;
+
+    import banking.helpers.Action;
+    import banking.menu.Menu;
+
+    import java.util.Scanner;
+
+    public class UserInterfaceImpl implements UserInterface {
+
+        private final Scanner scanner = new Scanner(System.in);
+
+        @Override
+        public Action showMenu(Menu menu) {
+            menu.show();
+
+            return menu.getUserInput();
+        }
+
+        @Override
+        public void println(String log) {
+            System.out.println(log);
+        }
+
+        @Override
+        public void print(String log) {
+            System.out.print(log);
+        }
+
+        @Override
+        public int readInt() {
+            int nextInt = scanner.nextInt();
+            // throw away the \n char,
+            // https://stackoverflow.com/questions/23450524/java-scanner-doesnt-wait-for-user-input
+            scanner.nextLine();
+
+            return nextInt;
+        }
+
+        @Override
+        public String readLine() {
+            return scanner.nextLine();
+        }
+    }
+  learner_created: false
+- name: src/banking/account/Account.java
+  visible: true
+  text: |
+    package banking.account;
+
+    public interface Account {
+        public double getBalance();
+
+        public String getCardNumber();
+
+        public String getPinCode();
+
+        public boolean pinMatches(String pinCode);
+    }
+  learner_created: false
+- name: src/banking/account/AccountImpl.java
+  visible: true
+  text: |
+    package banking.account;
+
+    public class AccountImpl implements Account {
+
+        private final int binNumber;
+        private final long accountSequence;
+        private final int checkSum;
+        private final int pinCode;
+        private double balance;
+
+        public AccountImpl(int binNumber, long accountSequence, int checkSum, int pinCode) {
+            this.binNumber = binNumber;
+            this.accountSequence = accountSequence;
+            this.checkSum = checkSum;
+            this.pinCode = pinCode;
+            this.balance = 0;
+        }
+
+        @Override
+        public double getBalance() {
+            return this.balance;
+        }
+
+        @Override
+        public String getCardNumber() {
+            return this.binNumber + "" + this.accountSequence + "" + this.checkSum;
+        }
+
+        @Override
+        public String getPinCode() {
+            return String.valueOf(this.pinCode);
+        }
+
+        @Override
+        public boolean pinMatches(String pinCode) {
+            return String.valueOf(this.pinCode).equals(pinCode);
+        }
+    }
+  learner_created: false
+- name: src/banking/account/AccountManager.java
+  visible: true
+  text: |
+    package banking.account;
+
+    import java.util.Random;
+
+    public class AccountManager {
+
+        private static final int binNumber = 400000;
+        private static long accountSequence = 100000000;
+
+        public static Account newAccount() {
+
+            Random random = new Random(31);
+
+            int checkSum = random.nextInt(10);
+            int pinCode = random.nextInt(9999 - 1000) + 1000;
+
+            Account account = new AccountImpl(binNumber, accountSequence, checkSum, pinCode);
+
+            AccountManager.accountSequence += 1;
+
+            return account;
+        }
+    }
+  learner_created: false
+- name: src/banking/repository/AccountRepository.java
+  visible: true
+  text: |
+    package banking.repository;
+
+    import banking.account.Account;
+
+    public interface AccountRepository {
+
+        public Account createAccount(Account account);
+
+        public Account getAccountByNumber(String accountNumber);
+    }
+  learner_created: false
+- name: src/banking/repository/AccountRepositoryImpl.java
+  visible: true
+  text: |
+    package banking.repository;
+
+    import banking.account.Account;
+
+    import java.util.HashMap;
+    import java.util.Map;
+
+    public class AccountRepositoryImpl implements AccountRepository {
+
+        private final Map<String, Account> repository = new HashMap<>();
+
+        @Override
+        public Account createAccount(Account account) {
+            this.repository.put(account.getCardNumber(), account);
+
+            return account;
+        }
+
+        @Override
+        public Account getAccountByNumber(String accountNumber) {
+            return this.repository.get(accountNumber);
+        }
+    }
+  learner_created: false
+- name: src/banking/helpers/Constants.java
+  visible: true
+  text: |
+    package banking.helpers;
+
+    public abstract class Constants {
+
+        public static final String MENU_CREATE_ACCOUNT  = "Create an account";
+        public static final String MENU_LOG_IN  = "Log into account";
+        public static final String MENU_BALANCE  = "Balance";
+        public static final String MENU_LOGOUT  = "Log out";
+        public static final String MENU_EXIT  = "Exit";
+
+        public static final String MESSAGE_CARD_CREATED  = "Your card has been created";
+        public static final String MESSAGE_WRONG_CARD  = "Wrong card number or PIN!";
+        public static final String MESSAGE_LOGGED_IN  = "You have successfully logged in!";
+        public static final String MESSAGE_LOGGED_OUT  = "You have successfully logged out!";
+        public static final String MESSAGE_BYE  = "Bye!";
+
+        public static final String LABEL_YOUR_CARD  = "Your card number:";
+        public static final String LABEL_YOUR_PIN  = "Your card PIN:";
+        public static final String LABEL_BALANCE  = "Balance:";
+
+        public static final String QUESTION_YOUR_CARD  = "Enter your card number:";
+        public static final String QUESTION_YOUR_PIN  = "Enter your PIN:";
+
+        public static final String SYMBOL_INPUT  = ">";
+    }
+  learner_created: false
+- name: src/banking/helpers/Action.java
+  visible: true
+  text: |
+    package banking.helpers;
+
+    public enum Action {
+
+        CREATE_ACCOUNT(1),
+        LOGIN_ACCOUNT(2),
+        LOGOUT_ACCOUNT(2),
+        BALANCE(1),
+        EXIT(0);
+
+        private final int value;
+
+        private Action(int value) {
+            this.value = value;
+        }
+
+        public int getValue() {
+            return value;
+        }
+    }
+  learner_created: false
+- name: src/banking/auth/Authenticator.java
+  visible: true
+  text: |
+    package banking.auth;
+
+    import banking.account.Account;
+
+    public interface Authenticator {
+
+        public boolean login(String accountNumber, String pinCode);
+
+        public void logout();
+
+        public boolean isLoggedIn();
+
+        public Account account();
+    }
+  learner_created: false
+- name: src/banking/auth/AuthenticatorImpl.java
+  visible: true
+  text: |
+    package banking.auth;
+
+    import banking.account.Account;
+    import banking.repository.AccountRepository;
+    import banking.ui.UserInterface;
+
+    public class AuthenticatorImpl implements Authenticator {
+
+        private final AccountRepository accountRepository;
+        private final UserInterface userInterface;
+
+        private Account loggedInUser;
+
+        public AuthenticatorImpl(AccountRepository accountRepository, UserInterface userInterface) {
+            this.accountRepository = accountRepository;
+            this.userInterface = userInterface;
+            this.loggedInUser = null;
+        }
+
+        @Override
+        public boolean login(String accountNumber, String pinCode) {
+            Account account = this.accountRepository.getAccountByNumber(accountNumber);
+
+            if (account == null || !account.pinMatches(pinCode)) {
+                this.loggedInUser = null;
+                return false;
+            }
+
+            this.loggedInUser = account;
+            return true;
+        }
+
+        @Override
+        public void logout() {
+            this.loggedInUser = null;
+        }
+
+        @Override
+        public boolean isLoggedIn() {
+            return this.loggedInUser != null;
+        }
+
+        @Override
+        public Account account() {
+            return this.loggedInUser;
+        }
+
+
+    }
+  learner_created: false
+- name: test/SimpleBankSystemTest.java
+  visible: false
+  text: |-
+    import org.hyperskill.hstest.stage.StageTest;
+    import org.hyperskill.hstest.testcase.CheckResult;
+    import org.hyperskill.hstest.testing.TestedProgram;
+    import org.hyperskill.hstest.dynamic.DynamicTest;
+
+    import java.util.Random;
+    import java.util.regex.Matcher;
+    import java.util.regex.Pattern;
+
+    public class SimpleBankSystemTest extends StageTest<String> {
+
+        private static final Pattern cardNumberPattern = Pattern.compile("^400000\\d{10}$", Pattern.MULTILINE);
+        private static final Pattern pinPattern = Pattern.compile("^\\d{4}$", Pattern.MULTILINE);
+
+        @DynamicTest
+        CheckResult test1_checkCardCredentials() {
+
+            TestedProgram program = new TestedProgram();
+            program.start();
+
+            String output = program.execute("1");
+
+            Matcher cardNumberMatcher = cardNumberPattern.matcher(output);
+
+            if (!cardNumberMatcher.find()) {
+                return CheckResult.wrong("You are printing the card number " +
+                    "incorrectly. The card number should look like in the example: " +
+                    "400000DDDDDDDDDD, where D is a digit.");
+            }
+
+            Matcher pinMatcher = pinPattern.matcher(output);
+
+            if (!pinMatcher.find()) {
+                return CheckResult.wrong("You are printing the card PIN " +
+                    "incorrectly. The PIN should look like in the example: DDDD, where D is " +
+                    "a digit.");
+            }
+
+            String correctCardNumber = cardNumberMatcher.group();
+
+            output = program.execute("1");
+            cardNumberMatcher = cardNumberPattern.matcher(output);
+
+            if (!cardNumberMatcher.find()) {
+                return CheckResult.wrong("You are printing the card number " +
+                    "incorrectly. The card number should look like in the example: " +
+                    "400000DDDDDDDDDD, where D is a digit.");
+            }
+
+            pinMatcher = pinPattern.matcher(output);
+
+            if (!pinMatcher.find()) {
+                return CheckResult.wrong("You are printing the card PIN " +
+                    "incorrectly. The PIN should look like in the example: DDDD, where D is " +
+                    "a digit.");
+            }
+
+            String anotherCardNumber = cardNumberMatcher.group();
+
+            if (anotherCardNumber.equals(correctCardNumber)) {
+                return CheckResult.wrong("Your program generates two identical card numbers!");
+            }
+
+            program.execute("0");
+
+            return CheckResult.correct();
+        }
+
+        @DynamicTest
+        CheckResult test2_checkLogInAndLogOut() {
+
+            TestedProgram program = new TestedProgram();
+            program.start();
+
+            String output = program.execute("1");
+
+            Matcher cardNumberMatcher = cardNumberPattern.matcher(output);
+
+            if (!cardNumberMatcher.find()) {
+                return new CheckResult(false, "You are printing the card number " +
+                    "incorrectly. The card number should look like in the example: " +
+                    "400000DDDDDDDDDD, where D is a digit.");
+            }
+
+            Matcher pinMatcher = pinPattern.matcher(output);
+
+            if (!pinMatcher.find()) {
+                return new CheckResult(false, "You are printing the card PIN " +
+                    "incorrectly. The PIN should look like in the example: DDDD, where D is " +
+                    "a digit.");
+            }
+            String correctPin = pinMatcher.group().trim();
+            String correctCardNumber = cardNumberMatcher.group();
+
+            program.execute("2");
+            output = program.execute(correctCardNumber + "\n" + correctPin);
+
+            if (!output.toLowerCase().contains("successfully")) {
+                return new CheckResult(false, "The user should be signed in after " +
+                    "entering the correct card information.");
+            }
+
+            output = program.execute("2");
+
+            if (!output.toLowerCase().contains("create")) {
+                return new CheckResult(false, "The user should be logged out after choosing 'Log out' option.\n" +
+                    "And you should print the menu with 'Create an account' option.");
+            }
+
+            program.execute("0");
+
+            return CheckResult.correct();
+        }
+
+        @DynamicTest
+        CheckResult test3_checkLogInWithWrongPin() {
+
+            TestedProgram program = new TestedProgram();
+            program.start();
+
+            String output = program.execute("1");
+
+            Matcher cardNumberMatcher = cardNumberPattern.matcher(output);
+            Matcher pinMatcher = pinPattern.matcher(output);
+
+            if (!cardNumberMatcher.find() || !pinMatcher.find()) {
+                return new CheckResult(false, "You should output card number and PIN like in example!");
+            }
+
+            String correctCardNumber = cardNumberMatcher.group();
+            String correctPin = pinMatcher.group();
+
+            Random random = new Random();
+
+            String incorrectPin = correctPin;
+
+            while (correctPin.equals(incorrectPin)) {
+                incorrectPin = String.valueOf(1000 + random.nextInt(8999));
+            }
+
+            program.execute("2");
+            output = program.execute(correctCardNumber + "\n" + incorrectPin);
+
+            if (output.toLowerCase().contains("successfully")) {
+                return new CheckResult(false, "The user should not be signed in after" +
+                    " entering incorrect card information.");
+            }
+
+            program.execute("0");
+
+            return CheckResult.correct();
+        }
+
+        @DynamicTest
+        CheckResult test4_checkLogInToNotExistingAccount() {
+
+            TestedProgram program = new TestedProgram();
+            program.start();
+
+            String output = program.execute("1");
+
+            Matcher cardNumberMatcher = cardNumberPattern.matcher(output);
+            Matcher pinMatcher = pinPattern.matcher(output);
+
+            if (!cardNumberMatcher.find() || !pinMatcher.find()) {
+                return new CheckResult(false, "You should output card number " +
+                    "and PIN like in example");
+            }
+
+            String correctCardNumber = cardNumberMatcher.group();
+
+            Random random = new Random();
+
+            String correctPin = pinMatcher.group().trim();
+            String incorrectCardNumber = correctCardNumber;
+
+            while (correctCardNumber.equals(incorrectCardNumber)) {
+                incorrectCardNumber = "400000" + (1_000_000_00 + random.nextInt(8_000_000_00));
+            }
+
+            program.execute("2");
+            output = program.execute(incorrectCardNumber + "\n" + correctPin);
+
+            if (output.toLowerCase().contains("successfully")) {
+                return new CheckResult(false, "The user should not be signed" +
+                    " in after entering the information of a non-existing card.");
+            }
+
+            return CheckResult.correct();
+        }
+
+        @DynamicTest
+        CheckResult test5_checkBalance() {
+
+            TestedProgram program = new TestedProgram();
+            program.start();
+
+            String output = program.execute("1");
+
+            Matcher cardNumberMatcher = cardNumberPattern.matcher(output);
+            Matcher pinMatcher = pinPattern.matcher(output);
+
+            if (!cardNumberMatcher.find() || !pinMatcher.find()) {
+                return new CheckResult(false, "You should output card number and PIN like in example");
+            }
+
+            String correctPin = pinMatcher.group().trim();
+            String correctCardNumber = cardNumberMatcher.group();
+
+            program.execute("2");
+            program.execute(correctCardNumber + "\n" + correctPin);
+            output = program.execute("1");
+
+            if (!output.contains("0")) {
+                return new CheckResult(false, "Expected balance: 0");
+            }
+
+            program.execute("0");
+
+            return CheckResult.correct();
+        }
+
+        @DynamicTest
+        CheckResult test6_checkLuhnAlgorithm() {
+
+            TestedProgram program = new TestedProgram();
+            program.start();
+
+            String output = program.execute("1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1");
+
+            Matcher cardNumberMatcher = cardNumberPattern.matcher(output);
+
+            boolean isSomeCardFound = false;
+            int foundCards = 0;
+
+            while (cardNumberMatcher.find()) {
+
+                foundCards++;
+
+                if (!isSomeCardFound) {
+                    isSomeCardFound = true;
+                }
+
+                String cardNumber = cardNumberMatcher.group();
+
+                if (!checkLuhnAlgorithm(cardNumber)) {
+                    return new CheckResult(false, String.format("The card number %s doesn’t pass the Luhn algorithm.", cardNumber));
+                }
+            }
+
+            if (!isSomeCardFound) {
+                return new CheckResult(false, "You should output card number and PIN like in example");
+            }
+
+            if (foundCards != 20) {
+                return new CheckResult(false, "Tried to generate 20 cards, but found " + foundCards);
+            }
+
+            return CheckResult.correct();
+        }
+
+        private boolean checkLuhnAlgorithm(String cardNumber) {
+            int result = 0;
+            for (int i = 0; i < cardNumber.length(); i++) {
+                int digit = Character.getNumericValue(cardNumber.charAt(i));
+                if (i % 2 == 0) {
+                    int doubleDigit = digit * 2 > 9 ? digit * 2 - 9 : digit * 2;
+                    result += doubleDigit;
+                    continue;
+                }
+                result += digit;
+            }
+            return result % 10 == 0;
+        }
+    }
+  learner_created: false
+feedback_link: https://hyperskill.org/projects/93/stages/516/implement#comment
+status: Solved
+feedback:
+  message: Congratulations!
+  time: Sat, 12 Jun 2021 15:08:56 UTC
+record: 2
